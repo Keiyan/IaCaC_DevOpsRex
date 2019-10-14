@@ -1,0 +1,283 @@
+---
+
+- name: create AD join credential type
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: 'adjoin_credential_type'
+      api: 'credential_types'
+      name: 'AD Join type'
+      body: 
+        name: "AD Join type"
+        description: "Credentials that can be used to connect to AD"
+        kind: "cloud"
+        inputs:
+          fields:
+            - id: "ad_user"
+              type: "string"
+              label: "AD User"
+              secret: false
+            - id: "ad_password"
+              type: "string"
+              label: "AD Password"
+              secret: true
+          required:
+            - "ad_user"
+            - "ad_password"
+        injectors:
+          extra_vars:
+            ad_add_user: "{% raw %}{{ '{{ ad_user }}' }}{% endraw %}"
+            ad_add_password: "{% raw %}{{ '{{ ad_password }}' }}{% endraw %}"
+
+- name: create AD join credential
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: 'adjoin_credential'
+      api: 'credentials'
+      name: 'AD Join'
+      body: 
+        name: "AD Join"
+        description: "Credentials used to add VM into AD"
+        organization: "{{ organisation.id }}"
+        credential_type: "{{ adjoin_credential_type.id }}"
+        inputs:
+          ad_user: "{{ credentials.AD.username }}"
+          ad_password: "{{ credentials.AD.password }}"
+
+- name: create job templates for VM
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: 'preregister_vm'
+      api: 'job_templates'
+      name: 'Preregister virtual machine'
+      body: 
+        name: "Preregister virtual machine"
+        description: "Register a virtual machine to IPAM and inventory as inactive"
+        job_type: "run"
+        inventory: "{{ inventory.id }}"
+        project: "{{ infra_template_project.id }}"
+        playbook: "preregister_vm.yml"
+        forks: 0
+        limit: ""
+        verbosity: 0
+        extra_vars: ""
+        job_tags: ""
+        force_handlers: false
+        skip_tags: ""
+        start_at_task: ""
+        timeout: 0
+        use_fact_cache: false
+        host_config_key: ""
+        ask_diff_mode_on_launch: false
+        ask_variables_on_launch: false
+        ask_limit_on_launch: false
+        ask_tags_on_launch: false
+        ask_skip_tags_on_launch: false
+        ask_job_type_on_launch: false
+        ask_verbosity_on_launch: false
+        ask_inventory_on_launch: false
+        ask_credential_on_launch: false
+        survey_enabled: false
+        become_enabled: false
+        diff_mode: false
+        allow_simultaneous: true
+        custom_virtualenv: null
+        job_slice_count: 1
+        credential: null
+        vault_credential: null
+    - variable: 'create_vm'
+      api: 'job_templates'
+      name: 'Create virtual machine'
+      body: 
+        name: "Create virtual machine"
+        description: "Create the virtual machine with bare OS"
+        job_type: "run"
+        inventory: "{{ inventory.id }}"
+        project: "{{ infra_template_project.id }}"
+        playbook: "create_vm.yml"
+        forks: 0
+        limit: ""
+        verbosity: 0
+        extra_vars: ""
+        job_tags: ""
+        force_handlers: false
+        skip_tags: ""
+        start_at_task: ""
+        timeout: 0
+        use_fact_cache: false
+        host_config_key: ""
+        ask_diff_mode_on_launch: false
+        ask_variables_on_launch: false
+        ask_limit_on_launch: false
+        ask_tags_on_launch: false
+        ask_skip_tags_on_launch: false
+        ask_job_type_on_launch: false
+        ask_verbosity_on_launch: false
+        ask_inventory_on_launch: false
+        ask_credential_on_launch: false
+        survey_enabled: false
+        become_enabled: false
+        diff_mode: false
+        allow_simultaneous: true
+        custom_virtualenv: null
+        job_slice_count: 1
+        credential: null
+        vault_credential: null
+    - variable: 'install_software'
+      api: 'job_templates'
+      name: 'Install software'
+      body: 
+        name: "Install software"
+        description: "Install mandaroty software (antivirus, monitoring agent, ...) on a machine"
+        job_type: "run"
+        inventory: "{{ inventory.id }}"
+        project: "{{ infra_template_project.id }}"
+        playbook: "register_vm.yml"
+        forks: 0
+        limit: ""
+        verbosity: 0
+        extra_vars: ""
+        job_tags: ""
+        force_handlers: false
+        skip_tags: ""
+        start_at_task: ""
+        timeout: 0
+        use_fact_cache: false
+        host_config_key: ""
+        ask_diff_mode_on_launch: false
+        ask_variables_on_launch: false
+        ask_limit_on_launch: false
+        ask_tags_on_launch: false
+        ask_skip_tags_on_launch: false
+        ask_job_type_on_launch: false
+        ask_verbosity_on_launch: false
+        ask_inventory_on_launch: false
+        ask_credential_on_launch: false
+        survey_enabled: false
+        become_enabled: false
+        diff_mode: false
+        allow_simultaneous: true
+        custom_virtualenv: null
+        job_slice_count: 1
+        credential: null
+        vault_credential: null
+    - variable: 'register_vm'
+      api: 'job_templates'
+      name: 'Register a virtual machine'
+      body: 
+        name: "Register a virtual machine"
+        description: "Register the VM as active in IPAM and inventory"
+        job_type: "run"
+        inventory: "{{ inventory.id }}"
+        project: "{{ infra_template_project.id }}"
+        playbook: "install_software.yml"
+        forks: 0
+        limit: ""
+        verbosity: 0
+        extra_vars: ""
+        job_tags: ""
+        force_handlers: false
+        skip_tags: ""
+        start_at_task: ""
+        timeout: 0
+        use_fact_cache: false
+        host_config_key: ""
+        ask_diff_mode_on_launch: false
+        ask_variables_on_launch: false
+        ask_limit_on_launch: false
+        ask_tags_on_launch: false
+        ask_skip_tags_on_launch: false
+        ask_job_type_on_launch: false
+        ask_verbosity_on_launch: false
+        ask_inventory_on_launch: false
+        ask_credential_on_launch: false
+        survey_enabled: false
+        become_enabled: false
+        diff_mode: false
+        allow_simultaneous: true
+        custom_virtualenv: null
+        job_slice_count: 1
+        credential: null
+        vault_credential: null
+    - variable: 'unregister_vm'
+      api: 'job_templates'
+      name: 'Unregister a virtual machine'
+      body: 
+        name: "Unregister a virtual machine"
+        description: "Remove the VM from IPAM and inventory"
+        job_type: "run"
+        inventory: "{{ inventory.id }}"
+        project: "{{ infra_template_project.id }}"
+        playbook: "install_software.yml"
+        forks: 0
+        limit: ""
+        verbosity: 0
+        extra_vars: ""
+        job_tags: ""
+        force_handlers: false
+        skip_tags: ""
+        start_at_task: ""
+        timeout: 0
+        use_fact_cache: false
+        host_config_key: ""
+        ask_diff_mode_on_launch: false
+        ask_variables_on_launch: false
+        ask_limit_on_launch: false
+        ask_tags_on_launch: false
+        ask_skip_tags_on_launch: false
+        ask_job_type_on_launch: false
+        ask_verbosity_on_launch: false
+        ask_inventory_on_launch: false
+        ask_credential_on_launch: false
+        survey_enabled: false
+        become_enabled: false
+        diff_mode: false
+        allow_simultaneous: true
+        custom_virtualenv: null
+        job_slice_count: 1
+        credential: null
+        vault_credential: null
+    - variable: 'delete_vm'
+      api: 'job_templates'
+      name: 'Removes a virtual machine'
+      body: 
+        name: "Removes a virtual machine"
+        description: "Destroy the VM"
+        job_type: "run"
+        inventory: "{{ inventory.id }}"
+        project: "{{ infra_template_project.id }}"
+        playbook: "install_software.yml"
+        forks: 0
+        limit: ""
+        verbosity: 0
+        extra_vars: ""
+        job_tags: ""
+        force_handlers: false
+        skip_tags: ""
+        start_at_task: ""
+        timeout: 0
+        use_fact_cache: false
+        host_config_key: ""
+        ask_diff_mode_on_launch: false
+        ask_variables_on_launch: false
+        ask_limit_on_launch: false
+        ask_tags_on_launch: false
+        ask_skip_tags_on_launch: false
+        ask_job_type_on_launch: false
+        ask_verbosity_on_launch: false
+        ask_inventory_on_launch: false
+        ask_credential_on_launch: false
+        survey_enabled: false
+        become_enabled: false
+        diff_mode: false
+        allow_simultaneous: true
+        custom_virtualenv: null
+        job_slice_count: 1
+        credential: null
+        vault_credential: null
+
+- name: add credentials to template
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - api: 'job_templates/{{ install_software.id }}/credentials'
+      name: 'AD Join'
+      body: '{ "id": {{ adjoin_credential.id }} }'

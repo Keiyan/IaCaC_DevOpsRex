@@ -1,0 +1,19 @@
+{
+    "name": "",
+    "description": "",
+    "spec": [
+      {
+        "question_name": "VM name",
+        "question_description": "",
+        "required": true,
+        "type": "text",
+        "variable": "vm_name",
+        "min": null,
+        "max": 15,
+        "default": "",
+        "choices": "",
+        "new_question": true
+      }
+    ]
+  }
+  

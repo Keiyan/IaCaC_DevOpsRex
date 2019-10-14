@@ -1,0 +1,50 @@
+---
+
+- name: check if infra_templates repository exists
+  uri:
+    headers:
+      Authorization: "token {{ gogs.token }}"
+    url: "{{ gogs.uri }}/api/v1/repos/search?q=infra_templates&limit=1"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: infra_templates_repo_exists
+
+- block:
+  - name: create infra_templates repository
+    uri:
+      headers:
+        Authorization: "token {{ gogs.token }}"
+      url: "{{ gogs.uri }}/api/v1/admin/users/{{ gogs.user }}/repos/"
+      validate_certs: "{{ validate_certs }}"
+      method: POST
+      status_code: 201
+      body_format: json
+      body:
+        name: "infra_templates"
+        description: "templates provided by infrastructure"
+  
+  - name: Clean existing files
+    file:
+      state: absent
+      path: "./infra_templates"
+  - name: create directory
+    file:
+      state: directory
+      path: "./infra_templates"
+   
+  - name: create templates
+    copy:
+      dest: "./infra_templates/{{ item }}.yml"
+      content: "{{ lookup ('file','hello_world.yml') }}"
+    loop: "{{ infra_templates }}"
+
+  - name: add files
+    shell: > 
+      git init;
+      git add .;
+      git commit -m "first commit";
+      git remote add origin {{ gogs.uri|replace('://', '://' + gogs.token + '@') }}/{{ gogs.user }}/infra_templates.git;
+      git push -u origin master
+    args:
+      chdir: "./infra_templates"
+  when: infra_templates_repo_exists.json.data|length == 0

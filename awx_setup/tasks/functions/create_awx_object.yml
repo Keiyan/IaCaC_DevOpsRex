@@ -1,0 +1,23 @@
+---
+
+- name: Build query string
+  set_fact:
+    awx_query_string: 'name={{ item.name | urlencode }}'
+  when: item.name is defined # If a name is defined, build the default query string
+
+- name: Build query string
+  set_fact:
+    awx_query_string: "{{ (index > 0)|ternary(awx_query_string,'') }}{{ (index > 0)|ternary('&','') }}{{ key_value_pair.key }}={{ key_value_pair.value | urlencode }}"
+  loop: "{{ item.search | default({}) | dict2items }}"
+  loop_control:
+    index_var: index
+    loop_var: key_value_pair
+  when: item.search is defined # otherwise, build the query string from the given parameters
+
+- include_tasks: functions/create_awx_object_inner.yml # call our inner task
+  vars:
+    new_awx_query_string: "{{ awx_query_string }}" # use the query string built before
+    new_awx_variable_name: "{{ item.variable | default ('new_awx_item') }}" # sometimes you aren't insterrested in storing the result, so let's define a default variable name
+    new_awx_api: "{{ item.api }}"
+    new_awx_body: "{{ item.body }}"
+    new_awx_display_name: "{{ item.name | default(item.variable) | default('AWX object') }}" # Try to define the display name automatically

@@ -1,0 +1,31 @@
+---
+
+- name: "obtain role {{ role }} for item {{ object.name | default('AWX item') }}"
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}{{ object.related.object_roles }}?search={{ role }}" # We get the correct role from the target object
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: item_role # We use a variable name that will be reused from execution to execution, because it has no importance outside of this context
+
+- name: check if {{ role }} registered in {{ team.name }}
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}/api/v2/teams/{{ team.id }}/roles?id={{ item_role.json.results[0].id }}" ## We search for it in the team
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: item_role_exists # We use a variable name that will be reused from execution to execution, because it has no importance outside of this context
+
+- name: add role to {{ team.name }} team
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}{{ team.related.roles }}" # this is the URI to add roles to a team
+    validate_certs: "{{ validate_certs }}"
+    method: POST
+    body_format: json
+    status_code: 204
+    body: '{"id": {{ item_role.json.results[0].id }}}'
+  when: item_role_exists.json.count == 0 # Don't add the role if it's already present

@@ -1,0 +1,28 @@
+---
+
+awx:
+  url: # URL for awx
+  token: # Token used to connect to AWX
+gogs:
+  uri: # GOGS uri
+  token: # PAT used for authentication
+saml:
+  certificate: # OKTA certificate, as provided by Engie IT
+  entity: # Entity ID, as provided by Engie IT
+  url: # SAML url, as provided by Engie IT
+environment_name: # Should be empty for PROD, env for others (eg dev1, dev2, hom, ...)
+credentials:
+  Azure: # parameters used to connect to Azure
+    subscription:
+    tenant:
+    application_id:
+    application_secret:
+ansible_sudo_pass: # password to become super user
+keep_admin_account: # set to true to keep it, false to remove it
+infra_templates: # this is the list of available playbooks. It is used at first setup to create empty shells
+  - preregister_vm
+  - create_vm
+  - install_software
+  - register_vm
+  - unregister_vm
+  - delete_vm

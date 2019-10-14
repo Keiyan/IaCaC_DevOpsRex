@@ -1,0 +1,28 @@
+- set_fact:
+    rights:
+    - team: "{{ team }}"
+      roles:
+        - name: read
+          objects:
+            - "{{ organisation }}"
+        - name: use
+          objects:
+            - "{{ inventory_credential }}"
+            - "{{ inventory }}"
+            - "{{ adjoin_credential }}"
+        - name: update
+          objects:
+            - "{{ infra_template_project }}"
+        - name: execute
+          objects:
+            - "{{ preregister_vm }}"
+            - "{{ create_vm }}"
+            - "{{ install_software }}"
+            - "{{ register_vm }}"
+            - "{{ unregister_vm }}"
+            - "{{ delete_vm }}"
+            - "{{ create_virtual_machine }}"
+            - "{{ delete_virtual_machine }}"
+
+- include_tasks: functions/set_rights.yml
+  loop: "{{ rights | subelements ('roles' ) }}"

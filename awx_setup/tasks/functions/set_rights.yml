@@ -1,0 +1,10 @@
+---
+
+# here we just call the inner loop for each object
+- include_tasks: functions/set_rights_inner.yml
+  vars:
+    team: "{{ item.0.team }}"
+    role: "{{ item.1.name }}"
+  loop: "{{ item.1.objects }}"
+  loop_control:
+    loop_var: object

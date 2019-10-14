@@ -1,0 +1,232 @@
+---
+
+- hosts: localhost
+  vars:
+    gogs:
+      uri: 'http://gogs:3000'
+      user: 'DevOpsRex'
+      password: 'DevOpxRex2019$'
+    awx:
+      uri: 'http://awx'
+      user: 'admin'
+      password: 'password'
+    dev_branch: 'master'
+  pre_tasks:
+    # You can of course fill in the awx_setup/vars/main.yml file, but using this method allows you to
+    # exclude the inventory.yml from repository and keep your passwords out of git !
+    - include_vars:
+        file: inventory.yml
+      ignore_errors: true
+
+    # This is a reminder for deployment logs
+    - debug:
+        msg: "Starting deployment on environment {{ environment_name }}; AWX URL is {{ awx.uri }}"
+
+    # Ensure needed python modules are present on host
+    - name: install python modules
+      pip:
+        name:
+          - docker
+          - docker-compose
+          - jmespath
+        state: present
+      become: yes
+
+    - block:
+      - name: spin up containers
+        docker_compose:
+          project_src: "./compose"
+        register: docker_spin_up
+      
+      - name: wait for web servers to start
+        pause:
+          seconds: 20
+        when: docker_spin_up.changed == true
+      when: setup_awx == true # We allow skipping this step to accelerate deployment on local computer
+
+    - block:
+      - name: Check if Gogs is installed
+        uri:
+          url: "{{ gogs.uri }}/"
+          validate_certs: "{{ validate_certs }}"
+          method: GET
+          status_code:
+            - 200
+            - 302
+          follow_redirects: all
+        register: is_gogs_alive
+
+      - name: Install Gogs
+        uri:
+          url: "{{ gogs.uri }}/install/"
+          validate_certs: "{{ validate_certs }}"
+          method: POST
+          status_code: 200
+          follow_redirects: all
+          body_format: form-urlencoded
+          body:
+            db_type: 'SQLite3' # Since this container can be rebuilt easily, we don't bother with and external database
+            db_host: '127.0.0.1:3306'
+            db_user: 'root'
+            db_passwd:
+            db_name: 'gogs'
+            ssl_mode: 'disable'
+            db_path: 'data/gogs.db'
+            app_name: 'Gogs'
+            repo_root_path: '/data/git/gogs-repositories'
+            run_user: 'git'
+            domain: 'localhost'
+            ssh_port: '22'
+            http_port: '3000'
+            app_url: 'http://localhost:3000/' # If you got a load balancer in front of your app, this is irrelevant.
+            log_root_path: '/app/gogs/log'
+            smtp_host:
+            smtp_from:
+            smtp_user:
+            smtp_passwd:
+            admin_name: "{{ gogs.user }}"
+            admin_passwd: "{{ gogs.password }}"
+            admin_confirm_passwd: "{{ gogs.password }}"
+            admin_email: 'me@keiyan.net' # Don't forget to change this !
+        when: # When gogs is brand new, there is a redirection from home apge to install page
+          - is_gogs_alive.redirected == true
+          - is_gogs_alive.url == gogs.uri + "/install"
+
+      - name: Retrieve Gogs token
+        uri:
+          url: "{{ gogs.uri }}/api/v1/users/{{ gogs.user }}/tokens"
+          user: "{{ gogs.user }}"
+          password: "{{ gogs.password }}"
+          force_basic_auth: true
+          validate_certs: "{{ validate_certs }}"
+          method: GET
+          status_code: 200
+        register: gogs_tokens
+
+      - name: Generate Gogs token
+        uri:
+          url: "{{ gogs.uri }}/api/v1/users/{{ gogs.user }}/tokens"
+          user: "{{ gogs.user }}"
+          password: "{{ gogs.password }}"
+          force_basic_auth: true
+          validate_certs: "{{ validate_certs }}"
+          method: POST
+          status_code: 201
+          body_format: json
+          body:
+            name: 'Setup'
+        register: gogs_token_generation
+        when: "'Setup' not in (gogs_tokens.json | map(attribute='name'))" # If the token don't exist, craete it.
+
+      # The way of setting the gogs variable depends on how we retrieved the token
+      - set_fact:
+          gogs:
+            uri: "{{ gogs.uri }}"
+            token: "{{ gogs_token_generation.json.sha1 }}"
+            user: "{{ gogs.user }}"
+        when: "'Setup' not in (gogs_tokens.json | map(attribute='name'))"
+      - set_fact:
+          gogs:
+            uri: "{{ gogs.uri }}"
+            token: "{{ (gogs_tokens | json_query(query))[0] }}"
+            user: "{{ gogs.user }}"
+        vars:
+          query: "json[?name=='Setup'].sha1"
+        when: "'Setup' in (gogs_tokens.json | map(attribute='name'))"
+
+    - block:
+      # At creation, the AWX postgres database needs to be set up. 
+      # We have to wait for this setup to end
+      - name: Wait for AWX setup to end
+        uri:
+          url: "{{ awx.uri }}/"
+          method: GET
+          status_code: 200, 302
+          follow_redirects: none
+        retries: 20
+        delay: 10
+        register: is_awx_up
+        until: is_awx_up.status == 200
+        when: setup_awx == true
+
+      - name: Little pause for contingency
+        pause:
+          seconds: 2
+        when: 
+          - setup_awx == true
+          - is_awx_up.attempts > 1
+
+      - name: Create token
+        uri:
+          url: "{{ awx.uri }}/api/v2/tokens/"
+          user: "{{ awx.user }}"
+          password: "{{ awx.password }}"
+          force_basic_auth: true
+          validate_certs: "{{ validate_certs }}"
+          method: POST
+          status_code: 201
+          follow_redirects: all
+          body_format: json
+          body:
+            description: "AWX Setup"
+            application: null
+            scope: "write"
+        register: awx_token
+      
+      - set_fact:
+          awx:
+            uri: "{{ awx.uri }}"
+            token: "{{ awx_token.json.token }}"
+
+  tasks:
+    - include_role:
+        name: awx_setup
+
+    # This is intended for local setup on dev computer.
+    # We push directly current repo onto gogs and switch branch in AWX project
+    - block:
+      - name: synchronize Git repository
+        shell: >
+          git push {{ remote | default('origin') }}
+        args:
+          chdir: "."
+      
+      - name: switch project target branch
+        uri:
+          headers:
+            Authorization: Bearer {{ awx.token }}
+          url: "{{ awx.uri }}/api/v2/projects/{{ infra_template_project.id }}/"
+          validate_certs: "{{ validate_certs }}"
+          method: PUT
+          status_code:
+            - 200
+          body_format: json
+          body:
+            name: "Infra templates"
+            description: "Job templates provided by infrastructure team"
+            scm_type: "git"
+            scm_url: "{{ gogs.uri }}/{{ gogs.user }}/infra_templates.git"
+            scm_branch: "{{ dev_branch }}"
+            scm_clean: true
+            scm_delete_on_update: true
+            credential: null
+            timeout: 0
+            organization: "{{ organisation.id }}"
+            scm_update_on_launch: false
+            scm_update_cache_timeout: 0
+            custom_virtualenv: null
+      when: 
+        - dev_branch is defined
+        - dev_branch != ''
+        - dev_branch != 'master'
+
+    # And finally we ensure the generated token cannot be used later for security reason
+    - name: remove token used for installation
+      uri:
+        url: "{{ awx.uri }}{{ awx_token.json.url }}"
+        headers:
+          Authorization: Bearer {{ awx.token }}
+        validate_certs: "{{ validate_certs }}"
+        method: DELETE
+        status_code: 204
+        follow_redirects: all

@@ -1,0 +1,58 @@
+---
+
+# First this is to verify if this object exists or not in AWX. 
+- name: "check if {{ new_awx_display_name }} exists" # new_awx_display_name contains a friendly name for the object, in order to have logs that can be read easily
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}" # awx.token is your access token to AWX
+    url: "{{ awx.uri }}/api/v2/{{ new_awx_api }}/?{{ new_awx_query_string }}" # awx.uri is the base URI of AWX, new_awx_api is the AWX API to call, for example organisations or job_templates and new_awx_query_string is the query string to use to find the object.
+    validate_certs: "{{ validate_certs }}" # Setting this to false is usefull when using local containers with a self generated certificate. Should be set to true when running toward production
+    method: GET
+  register: new_awx_create_item_exists # We use a variable name that will be reused from execution to execution, because it has no importance outside of this context
+
+# Here we define a new fact that register if the object was present or absent at the start of this script. This is for one time initialization.
+- name: "Register {{ new_awx_variable_name }}_exists"
+  set_fact: {"{{ new_awx_variable_name }}_exists": "{{ (new_awx_create_item_exists.json.count == 0) | ternary('absent','present') }}"} # We use JSON instead of pure YAML because it allows us to use a variable variable name
+
+# Now we create the item
+- name: "Create {{ new_awx_display_name }}"
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}/api/v2/{{ new_awx_api }}/"
+    validate_certs: "{{ validate_certs }}"
+    method: POST
+    status_code:
+      - 201
+      - 204
+    body_format: json
+    body: "{{ new_awx_body }}" # new_awx_body is the POST body for the request. Usually taken from a template or a file.
+  when: new_awx_create_item_exists.json.count == 0 # but only if it doesn't exist !
+
+# Now we update the item. Thus, if the content (read, new_awx_body) has changed, it is updated.
+- name: "Update {{ new_awx_display_name }}"
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}{{ new_awx_create_item_exists.json.results[0].url }}"
+    validate_certs: "{{ validate_certs }}"
+    method: PATCH
+    status_code:
+      - 200
+    body_format: json
+    body: "{{ new_awx_body }}"
+  when: new_awx_create_item_exists.json.count == 1 # but only if it already exists !
+
+# And then we retrieve the object, in its created or updated form.
+- name: "Retrieve newly created {{ new_awx_display_name }}"
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}"
+    url: "{{ awx.uri }}/api/v2/{{ new_awx_api }}/?{{ new_awx_query_string }}"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: new_awx_create_item_exists # We use a variable name that will be reused from execution to execution, because it has no importance outside of this context
+
+# And we store it using the variable ame provided by the caller
+- name: "get {{ new_awx_display_name }}"
+  set_fact: {"{{ new_awx_variable_name }}": "{{ new_awx_create_item_exists.json.results[0] }}"} # We use JSON instead of pure YAML because it allows us to use a variable variable name

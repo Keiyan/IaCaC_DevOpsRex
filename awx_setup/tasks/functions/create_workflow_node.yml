@@ -1,0 +1,21 @@
+---
+
+- include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: "{{ node.variable }}"
+      api: 'workflow_job_template_nodes'
+      search:
+        unified_job_template: "{{ node.target.id }}" # We take the id using the unified template API, to accept both job and workflow templates
+        workflow_job_template: "{{ node.workflow.id }}"
+      body:
+        extra_data: {}
+        inventory: null
+        job_type: null
+        job_tags: null
+        skip_tags: null
+        limit: null
+        diff_mode: null
+        verbosity: null
+        credential: null
+        workflow_job_template: "{{ node.workflow.id }}"
+        unified_job_template: "{{ node.target.id }}"
