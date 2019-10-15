@@ -1,0 +1,98 @@
+- hosts: localhost
+  vars:
+    tiller_namespace: devopsrex
+  tasks:
+    - name: detect helm version
+      shell: "helm version --short -c | sed -e 's_Client: __g' -e 's_\\.[0-9\\.+a-z]*__g'"
+      register: helm_version
+      
+    - name: check if repo is already installed
+      shell: helm repo list | grep kubernetes-charts.storage.googleapis.com | wc -l
+      register: is_helm_repo_present
+      
+    - name: set up helm repo
+      shell: helm repo add stable https://kubernetes-charts.storage.googleapis.com/
+      when: is_helm_repo_present.stdout == '0'
+      
+    - name: update helm repo
+      shell: helm repo update
+    
+    - name: "Create namespaces"
+      k8s:
+        name: "{{ item }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+      loop: 
+        - "{{ tiller_namespace }}"
+
+    - name: Install Tiller
+      shell: "helm init --tiller-namespace {{ tiller_namespace }}"
+      register: helm_init_result
+      when: helm_version.stdout == 'v2'
+
+    - name: Show helm init result
+      debug:
+        msg: "{{ helm_init_result.stdout_lines }}"
+      when: helm_version.stdout == 'v2'
+
+    - name: retrieve dashboard init file
+      get_url:
+        url: https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta4/aio/deploy/recommended.yaml
+        dest: /tmp/dashboard.yml
+
+    - name: Prepare dashboard env
+      k8s:
+        src: /tmp/dashboard.yml
+        state: present
+
+    - name: Create Dashboard Service Account
+      k8s:
+        state: present
+        definition:
+          name: "admin-user"
+          api_version: v1
+          kind: ServiceAccount
+          metadata:
+            name: "admin-user"
+        namespace: kubernetes-dashboard
+
+    - name: k8s RBAC config for admin-user
+      k8s:
+        name: "admin-user"
+        api_version: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        state: present
+        definition: 
+          metadata:
+            name: admin-user
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+          - kind: ServiceAccount
+            name: admin-user
+            namespace: kubernetes-dashboard
+          - kind: ServiceAccount
+            name: admin-user
+            namespace: giac-local
+
+    - name: Retrieve dashboard token
+      shell: kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}') | egrep '^token:' | sed -e 's_token:__g' -e 's_ __g'
+      register: token
+
+    - name: Display token
+      debug: 
+        var: token.stdout
+
+    - name: Launch Proxy in background
+      shell: nohup kubectl proxy </dev/null >/dev/null 2>&1 &
+
+    - name: Deploy nginx ingress pod
+      shell: "helm install stable/nginx-ingress --name nginx-ingress --tiller-namespace {{ tiller_namespace }} --namespace {{ tiller_namespace }}"
+      when: helm_version.stdout == 'v2'
+      
+    - name: Deploy nginx ingress pod
+      shell: "helm install nginx-ingress --namespace {{ tiller_namespace }} stable/nginx-ingress"
+      when: helm_version.stdout == 'v3'

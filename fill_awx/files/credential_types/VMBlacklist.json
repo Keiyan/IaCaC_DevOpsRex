@@ -1,0 +1,24 @@
+{
+  "name": "VM Blacklist",
+  "description": "List of blacklisted hostnames",
+  "kind": "cloud",
+  "inputs": {
+    "fields": [
+      {
+        "id": "hosts_list",
+        "type": "string",
+        "label": "List of blacklisted hostnames in json",
+        "secret": false,
+        "multiline": true
+      }
+    ],
+    "required": [
+      "hosts_list"
+    ]
+  },
+  "injectors": {
+    "extra_vars": {
+      "hosts_blacklist": "{{ hosts_list }}"
+    }
+  }
+}

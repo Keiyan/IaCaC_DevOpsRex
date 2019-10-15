@@ -1,0 +1,13 @@
+---
+
+- include_tasks: base/settings.yml
+- include_tasks: base/organisation.yml
+- include_tasks: base/team.yml
+- include_tasks: base/azure_inventory.yml
+- include_tasks: base/projects.yml
+
+- include_tasks: virtualmachine/main.yml
+
+- include_tasks: rights/main.yml
+
+- include_tasks: base/accounts.yml

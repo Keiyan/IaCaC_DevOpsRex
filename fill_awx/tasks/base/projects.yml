@@ -1,0 +1,54 @@
+---
+
+- name: create Infra template project
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: 'infra_template_project'
+      api: 'projects'
+      name: 'Infra templates'
+      body: "{{ lookup('template','infra_template_project.json') }}"
+
+- name: Give a little time for object creation
+  pause:
+    seconds: 2
+  when: infra_template_project_exists == 'absent'
+
+- name: Wait until the end of project synchronisation
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}"
+    url: "{{ awx.uri }}{{ infra_template_project.related.current_update }}"
+    validate_certs: "{{ validate_certs }}"
+    status_code: 200
+    method: GET
+  register: infra_template_project_synchronized
+  until: infra_template_project_synchronized.json.status == 'successful'
+  retries: 60
+  delay: 1
+  when: infra_template_project_exists == 'absent'
+
+- name: Update project
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}"
+    url: "{{ awx.uri }}{{ infra_template_project.related['update'] }}"
+    validate_certs: "{{ validate_certs }}"
+    status_code: 202
+    method: POST
+    body: ''
+  register: infra_template_project_update
+  when: infra_template_project_exists == 'present'
+
+- name: Wait until the end of project synchronisation
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}"
+    url: "{{ awx.uri }}{{ infra_template_project_update.json.url }}"
+    validate_certs: "{{ validate_certs }}"
+    status_code: 200
+    method: GET
+  register: infra_template_project_udpated
+  until: infra_template_project_udpated.json.status == 'successful'
+  retries: 60
+  delay: 1
+  when: infra_template_project_exists == 'present'

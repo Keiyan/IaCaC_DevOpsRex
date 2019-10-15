@@ -1,0 +1,180 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+name: "$(Build.SourceBranchName)-$(Year:yyyy).$(DayOfYear)$(Rev:.r)"
+trigger:
+  branches:
+    include:
+      - '*'
+variables:
+- group: secrets-release
+- name: "gogs.url"
+  value: "http://$(Gogs.token)@$(Gogs.hostname):$(Gogs.port)/$(inventory.gogs.user)"
+- name: "inventory.helm.environment_name"
+  value: "$(System.StageName)"
+- name: "Gogs.hostname" 
+  value: "giacportal-gogs-$(System.StageName).chez.toi"
+- name: "Gogs.port" 
+  value: "80"
+- name: "inventory.ansible.version" 
+  value: "2.9.2"
+- name: "inventory.awx.version" 
+  value: "9.1.0"
+- name: "inventory.credentials.Azure.application_id" 
+  value: "XXX"
+- name: "inventory.credentials.Azure.subscription" 
+  value: "XXX"
+- name: "inventory.credentials.Azure.tenant" 
+  value: "XXX"
+- name: "inventory.environment_name" 
+  value: "$(System.StageName)"
+- name: "inventory.gogs.uri" 
+  value: "http://$(Gogs.hostname)"
+- name: "inventory.gogs.port" 
+  value: "80"
+- name: "inventory.gogs.user" 
+  value: "DevOpsRex"
+- name: "inventory.kubernetes.namespace" 
+  value: "DOR-$(System.StageName)"
+- name: "inventory.kubernetes.proxy" 
+  value: "(empty)"
+- name: "inventory.kubernetes.service_dns_suffix" 
+  value: "svc.cluster.local"
+- name: "inventory.kubernetes.cluster.username"
+  value: "moi"
+- name: "inventory.postgres.user"
+  value: "postgres"
+- name: "inventory.postgres.replication.user"
+  value: "postgres_repl"
+- name: "inventory.ldap.username"
+  value: "CN=AD_authent,OU=Service Accounts,DC=test,DC=local"
+- name: "inventory.virtualenv.name" 
+  value: "/infra"
+- name: "inventory.virtualenv.path" 
+  value: "/home/awx/venvs"
+
+stages:
+- stage: dev1
+  displayName: DEV1 environment
+  variables:
+  - group: secrets-dev1
+  - name: "inventory.awx.user" 
+    value: "setup"
+  - name: "inventory.kubernetes.cluster.name"
+    value: "moncluster"
+  - name: "inventory.kubernetes.cluster.code"
+    value: "c-code"
+  - name: "inventory.awx.uri" 
+    value: "https://devopsrex-$(System.StageName).chez.toi"
+  - name: "inventory.kubernetes.host.awx"
+    value: "devopsrex-$(System.StageName).chez.toi"
+  - name: "inventory.kubernetes.replicas.awx_web"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.awx_task"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.rabbitmq"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.postgres"
+    value: "1"
+  - name: "inventory.saml.OKTA.entity" 
+    value: "(empty)"
+  - name: "inventory.saml.OKTA.url" 
+    value: "(empty)"
+  - name: "inventory.validate_certs" 
+    value: "false"
+  - name: "run.tests" 
+    value: "true"
+  jobs:
+  - job: deploy
+    displayName: Setup AWX environment
+    timeoutInMinutes: 120
+    pool:
+      name: GIAC
+      demands:
+        - ansible
+    steps:
+    - template: azure_yaml/deploy_stage.yaml
+
+- stage: hom
+  displayName: HOMOLOGATION environment
+  condition: and(succeeded(), or(eq(variables['build.sourceBranch'], 'refs/heads/master'), eq(variables['build.sourceBranch'], 'refs/heads/develop')))
+  variables:
+  - group: secrets-hom
+  - name: "inventory.awx.user" 
+    value: "setup"
+  - name: "inventory.kubernetes.cluster.name"
+    value: "moncluster"
+  - name: "inventory.kubernetes.cluster.code"
+    value: "c-code"
+  - name: "inventory.awx.uri" 
+    value: "https://devopsrex-$(System.StageName).chez.toi"
+  - name: "inventory.kubernetes.host.awx"
+    value: "devopsrex-$(System.StageName).chez.toi"
+  - name: "inventory.kubernetes.replicas.awx_web"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.awx_task"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.rabbitmq"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.postgres"
+    value: "1"
+  - name: "inventory.saml.OKTA.entity" 
+    value: "(empty)"
+  - name: "inventory.saml.OKTA.url" 
+    value: "(empty)"
+  - name: "inventory.validate_certs" 
+    value: "false"
+  - name: "run.tests" 
+    value: "false"
+  jobs:
+  - job: deploy
+    displayName: Setup AWX environment
+    pool:
+      name: GIAC
+      demands:
+        - ansible
+    steps:
+    - template: azure_yaml/deploy_stage.yaml
+
+- stage: prd
+  displayName: PRODUCTION environment
+  condition: and(succeeded(), eq(variables['build.sourceBranch'], 'refs/heads/master'))
+  variables:
+  - group: secrets-prd
+  - name: "inventory.awx.user" 
+    value: "setup"
+  - name: "inventory.kubernetes.cluster.name"
+    value: "moncluster"
+  - name: "inventory.kubernetes.cluster.code"
+    value: "c-code"
+  - name: "inventory.awx.uri" 
+    value: "https://devopsrex-$(System.StageName).chez.toi"
+  - name: "inventory.kubernetes.host.awx"
+    value: "devopsrex-$(System.StageName).chez.toi"
+  - name: "inventory.kubernetes.replicas.awx_web"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.awx_task"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.rabbitmq"
+    value: "1"
+  - name: "inventory.kubernetes.replicas.postgres"
+    value: "1"
+  - name: "inventory.saml.OKTA.entity" 
+    value: "(empty)"
+  - name: "inventory.saml.OKTA.url" 
+    value: "(empty)"
+  - name: "inventory.validate_certs" 
+    value: "false"
+  - name: "run.tests" 
+    value: "false"
+  jobs:
+  - job: deploy
+    displayName: Setup AWX environment
+    pool:
+      name: GIAC
+      demands:
+        - ansible
+    steps:
+    - template: azure_yaml/deploy_stage.yaml

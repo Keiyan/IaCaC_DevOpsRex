@@ -1,0 +1,18 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: "{{ kubernetes.cluster.certificate }}"
+    server: "{{ kubernetes.cluster.url }}"
+  name: "{{ kubernetes.cluster.name }}"
+contexts:
+- context:
+    cluster: "{{ kubernetes.cluster.name }}"
+    user: "{{ kubernetes.cluster.user }}"
+  name: "{{ kubernetes.cluster.name }}"
+current-context: "{{ kubernetes.cluster.name }}"
+kind: Config
+preferences: {}
+users:
+- name: "{{ kubernetes.cluster.user }}"
+  user:
+    token: "{{ kubernetes.cluster.token }}"

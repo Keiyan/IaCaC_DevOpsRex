@@ -1,0 +1,63 @@
+---
+
+- name: Creating password for localais
+  set_fact:
+    localais_password: "{{ lookup('password', '/dev/null length=1 chars=ascii_lowercase') | regex_replace('o', 'p')}}{{ lookup('password', '/dev/null length=1 chars=ascii_uppercase') | regex_replace('O', 'N')}}{{ lookup('password', '/dev/null length=1 chars=digits') | regex_replace('0', '1')}}{{ lookup('password', '/dev/null length=9 chars=ascii_lowercase,ascii_uppercase,digits') | regex_replace('0', '1') | regex_replace('o', 'p') | regex_replace('O', 'N')}}"
+
+- name: create localais account
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - { 
+        variable: 'localais_account', 
+        api: 'users', 
+        search: {
+          username: 'localais'
+        },
+        body: "{{ lookup('template','localais_account.json') }}", 
+      }
+
+- name: display information about real admin account
+  debug:
+    msg: "Account localais has been created with password {{ localais_password }}. Save it as it isn't stored !"
+
+- name: get admin account
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}/api/v2/users/?search={{ awx.user }}"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: admin_account
+
+
+- block:
+  - name: Create token to remove admin
+    uri:
+      url: "{{ awx.uri }}/api/v2/tokens/"
+      user: "localais"
+      password: "{{ localais_password }}"
+      force_basic_auth: true
+      validate_certs: "{{ validate_certs }}"
+      method: POST
+      status_code: 201
+      follow_redirects: all
+      body_format: json
+      body:
+        description: "Admin account deletion"
+        application: null
+        scope: "write"
+    register: localais_token
+
+  - name: remove admin account
+    uri:
+      headers:
+        Authorization: Bearer {{ localais_token.json.token }}
+      url: "{{ awx.uri }}/api/v2/users/{{ admin_account.json.results[0].id }}"
+      method: DELETE
+      validate_certs: "{{ validate_certs }}"
+      follow_redirects: all
+      status_code: 204
+  when: 
+    - admin_account.json.count == 1
+    - localais_account_exists == 'absent'
+    - control.keep_admin_account is not defined or control.keep_admin_account == false

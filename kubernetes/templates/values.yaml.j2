@@ -1,0 +1,140 @@
+# Default values for awx
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Choose between 'local' and 'rancher'
+target: "{{ kubernetes.target }}"
+
+awx_web:
+  replicaCount: {{ kubernetes.replicas.awx_web | default('1') | int }}
+  image:
+    repository: ansible/awx_web
+    tag: "{{ awx.version }}"
+    pullPolicy: IfNotPresent
+
+awx_task:
+  replicaCount: {{ kubernetes.replicas.awx_task | default('1') | int }}
+  image:
+    repository: ansible/awx_task
+    tag: "{{ awx.version }}"
+    pullPolicy: IfNotPresent
+
+# AWX config
+awx_secret_key: awxsecret
+default_admin_user: "{{ awx.user }}"
+default_admin_password: "{{ awx.password }}"
+
+# certificate
+certificate:
+  crt:
+  key:
+
+# Proxy parameters
+proxy:
+  address: "{{ kubernetes.proxy }}"
+  noproxy: localhost,gogs,awx,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,docker.internal,svc.cluster.local,azure.net
+
+deployment:
+  annotations: {}
+
+# description for the gogs and awx services
+service:
+  awx:
+    host: "{{ kubernetes.host.awx }}"
+  gogs:
+    host: "{{ kubernetes.host.gogs }}"
+
+# Chart values https://github.com/helm/charts/blob/master/stable/memcached/values.yaml
+memcached:
+  install: true
+  AntiAffinity: "soft"
+
+# Chart values https://github.com/helm/charts/blob/master/stable/rabbitmq/values.yaml
+rabbitmq:
+  install: true
+  replicas: {{ kubernetes.replicas.rabbitmq | default('1') | int }}
+  volumePermissions:
+    enabled: true
+  persistence:
+    enabled: true
+    existingClaim: awx-chart-{{ kubernetes.environment }}-rabbitmq-volume
+  rabbitmq:
+    username: awx
+    password: "fds2SHcnsjz24"
+    ## Configution file content https://www.rabbitmq.com/configure.html#configuration-files
+    configuration: |-
+        ## Clustering
+        cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
+        cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+        cluster_formation.node_cleanup.interval = 10
+        cluster_formation.node_cleanup.only_log_warning = false
+        cluster_partition_handling = autoheal
+        ## queue master locator
+        queue_master_locator=min-masters
+        ## enable guest user
+        loopback_users.guest = false
+        ## awx vhost
+        default_vhost = awx
+
+# Chart values https://github.com/helm/charts/blob/master/stable/postgresql/values.yaml
+postgresql:
+  install: true
+  image:
+    registry: docker.io
+    repository: bitnami/postgresql
+    tag: 11.6.0
+  postgresqlUsername: "{{ postgres.user }}"
+  postgresqlPassword: "{{ postgres.password }}"
+  postgresqlDatabase: awx
+  {% if kubernetes.replicas.postgres != 1 -%}
+  replication:
+    user: "{{ postgres.replication.user }}"
+    password: "{{ postgres.replication.password }}"
+    enabled: true
+    slaveReplicas: {{ kubernetes.replicas.postgres | default('1') | int }}
+    synchronousCommit: "on"
+    numSynchronousReplicas: 1
+  {% endif -%}
+  persistence:
+    enabled: true
+    existingClaim: awx-chart-{{ kubernetes.environment }}-postgres-volume
+  metrics:
+    enabled: false
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# define content of the custom venv
+custom_venvs:
+  path: "{{ virtualenv.path }}"
+  python: "python3"
+  python_ansible_version: "{{ ansible.version }}"
+  name: "{{ virtualenv.name }}"
+  yum_modules:
+    - cairo-devel
+    - cairo-gobject-devel
+    - gcc-c++ 
+    - glib2-devel
+    - gobject-introspection-devel
+    - gpgme-devel
+    - libcurl-devel
+    - libxml2-devel
+    - mercurial 
+  python_modules:
+    - ansible=={{ ansible.version }}
+    - dnspython

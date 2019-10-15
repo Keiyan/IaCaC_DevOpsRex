@@ -1,0 +1,54 @@
+---
+
+- name: Retrieve Gogs token
+  uri:
+    url: "{{ gogs.uri }}:{{ gogs.port }}/api/v1/users/{{ gogs.user }}/tokens"
+    user: "{{ gogs.user }}"
+    password: "{{ gogs.password }}"
+    force_basic_auth: true
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+    status_code: 200
+  register: gogs_tokens
+
+- name: Generate Gogs token
+  uri:
+    url: "{{ gogs.uri }}:{{ gogs.port }}/api/v1/users/{{ gogs.user }}/tokens"
+    user: "{{ gogs.user }}"
+    password: "{{ gogs.password }}"
+    force_basic_auth: true
+    validate_certs: "{{ validate_certs }}"
+    method: POST
+    status_code: 201
+    body_format: json
+    body:
+      name: 'Setup'
+  register: gogs_token_generation
+  when: "'Setup' not in (gogs_tokens.json | map(attribute='name'))"
+
+- set_fact:
+    gogs_internal_uri: "http://awx-chart-{{ environment_name | lower }}-gogs.{{ kubernetes.namespace }}.{{ kubernetes.service_dns_suffix }}:{{ gogs.port }}"
+  when: 
+    - deployment_type == 'k8s'
+
+- set_fact:
+    gogs_real_token: "{{ gogs_token_generation.json.sha1 }}"
+  when: 
+    - "'Setup' not in (gogs_tokens.json | map(attribute='name'))"
+- set_fact:
+    gogs_real_token: "{{ (gogs_tokens | json_query(query))[0] }}"
+  vars:
+    query: "json[?name=='Setup'].sha1"
+  when: 
+    - "'Setup' in (gogs_tokens.json | map(attribute='name'))"
+
+# you cannot add things to a fact, you have to redefine it...
+- set_fact:
+    gogs:
+      uri: "{{ gogs.uri }}"
+      port: "{{ gogs.port }}"
+      internal_uri: "{{ gogs_internal_uri | default (omit) }}"
+      token: "{{ gogs_real_token }}"
+      source_branch: "{{ gogs.source_branch | default (dev_branch) | default ('master') | replace ('refs/heads/', '') }}"
+      user: "{{ gogs.user }}"
+      sources: "{{ gogs.sources }}"

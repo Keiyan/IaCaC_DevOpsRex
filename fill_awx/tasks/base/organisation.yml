@@ -1,0 +1,30 @@
+---
+
+- block:
+  - name: create organisation
+    include_tasks: functions/create_awx_object.yml
+    loop:
+      - variable: 'organisation'
+        api: 'organizations'
+        name: 'IaCaC'
+        body: 
+          name: "IaCaC"
+          description: ""
+          max_hosts: 0
+          custom_virtualenv: "{{ (virtualenv.path | default('')) + (virtualenv.name | default('')) | default('/') }}"
+  rescue:
+  - name: wait for venvs to be scanned
+    pause:
+      seconds: 60
+
+  - name: create organisation with venv working
+    include_tasks: functions/create_awx_object.yml
+    loop:
+      - variable: 'organisation'
+        api: 'organizations'
+        name: 'IaCaC'
+        body: 
+          name: "IaCaC"
+          description: ""
+          max_hosts: 0
+          custom_virtualenv: "{{ (virtualenv.path | default('')) + (virtualenv.name | default('')) | default('/') }}"

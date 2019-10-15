@@ -1,0 +1,9 @@
+---
+
+- name: create team for all users
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: 'team_all'
+      api: 'teams'
+      name: 'All'
+      body: '{"name": "All","description": "","organization": {{ organisation.id }}}'

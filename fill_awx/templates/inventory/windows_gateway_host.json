@@ -1,0 +1,7 @@
+{
+  "variables":"---\n\nansible_connection: winrm\nansible_winrm_transport: ntlm\nansible_port: 5985\nansible_become: yes\nansible_become_method: runas\nansible_become_flags: logon_type=new_credentials logon_flags=netcredentials_only\n",
+  "name":"{{ lookup ( 'vars', 'WINDOWS_BRIDGE' ) }}",
+  "description":"Windows gateway",
+  "enabled":true,
+  "inventory":"{{ Azure_inventory.id }}"
+}

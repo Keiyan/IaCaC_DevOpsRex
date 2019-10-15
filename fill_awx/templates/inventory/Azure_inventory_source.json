@@ -1,0 +1,21 @@
+{
+    "name": "Azure Inventory Source",
+    "description": "Inventory source for Azure subscription",
+    "source": "azure_rm",
+    "source_path": "",
+    "source_script": null,
+    "source_vars": "",
+    "credential": {{ Azure_credentials.id }},
+    "source_regions": "westeurope",
+    "instance_filters": "",
+    "group_by": "",
+    "overwrite": true,
+    "overwrite_vars": true,
+    "custom_virtualenv": "{{ (virtualenv.path | default('')) + (virtualenv.name | default('')) | default('/') }}",
+    "timeout": 0,
+    "verbosity": 1,
+    "update_on_launch": false,
+    "update_cache_timeout": 0,
+    "source_project": null,
+    "update_on_project_update": false
+}

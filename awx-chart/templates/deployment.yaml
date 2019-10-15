@@ -1,0 +1,269 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "awx.fullname" . }}-gogs
+  namespace: {{ .Release.Namespace }}
+  labels:
+    ansible/name: {{ template "awx.fullname" . }}-gogs
+    app.kubernetes.io/name: {{ include "awx.name" . }}-gogs
+    helm.sh/chart: {{ include "awx.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "awx.name" . }}-gogs
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "awx.name" . }}-gogs
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        ansible/name: {{ template "awx.fullname" . }}-gogs
+    spec:
+      containers:
+      - image: gogs/gogs
+        name: {{ template "awx.fullname" . }}-gogs
+        ports:
+        - containerPort: 3000
+        - containerPort: 22
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+        resources: {}
+        volumeMounts:
+        - mountPath: /data
+          name: {{ template "awx.fullname" . }}-gogs
+      hostname: {{ template "awx.fullname" . }}-gogs
+      restartPolicy: Always
+      volumes:
+      - name: {{ template "awx.fullname" . }}-gogs
+        persistentVolumeClaim:
+          claimName: {{ template "awx.fullname" . }}-gogs-volume
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ include "awx.fullname" . }}-web
+  namespace: {{ .Release.Namespace }}
+  labels:
+    ansible/name: {{ template "awx.fullname" . }}-web
+    app.kubernetes.io/name: {{ include "awx.name" . }}-web
+    helm.sh/chart: {{ include "awx.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    {{- range $key, $value := .Values.deployment.annotations }}
+      {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.awx_web.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "awx.name" . }}-web
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "awx.name" . }}-web
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        ansible/name: {{ template "awx.fullname" . }}-web
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.awx_web.image.repository }}:{{ .Values.awx_web.image.tag }}"
+          imagePullPolicy: {{ .Values.awx_web.image.pullPolicy }}
+          command:
+            - /tini
+            - --
+            - /etc/bin/web-entrypoint.sh
+          ports:
+            - containerPort: 8052
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8052
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8052
+            initialDelaySeconds: 60
+          volumeMounts:
+            - name: {{ include "awx.fullname" . }}-nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - mountPath: /etc/tower
+              name: {{ include "awx.fullname" . }}-application-config
+              readOnly: true
+            - mountPath: /etc/bin
+              name: {{ include "awx.fullname" . }}-application-start
+              readOnly: true
+          env:
+            - name: DATABASE_USER
+              value: {{ .Values.postgresql.postgresqlUsername }}
+            - name: DATABASE_NAME
+              value: {{ .Values.postgresql.postgresqlDatabase }}
+            - name: DATABASE_HOST
+              value: {{ include "awx.fullname" . }}-postgresql
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_PASSWORD
+              value: {{ .Values.postgresql.postgresqlPassword }}
+            - name: MEMCACHED_HOST
+              value: {{ include "awx.fullname" . }}-memcached
+            - name: RABBITMQ_HOST
+              value: {{ include "awx.fullname" . }}-rabbitmq
+            - name: http_proxy
+              value: {{ .Values.proxy.address }}
+            - name: https_proxy
+              value: {{ .Values.proxy.address }}
+            - name: no_proxy
+              value: {{ .Values.proxy.noproxy }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+    {{- end }}
+      volumes:
+        - name: {{ include "awx.fullname" . }}-application-config
+          configMap:
+            name: {{ include "awx.fullname" . }}-application-config
+            items:
+              - key: awx_settings
+                path: settings.py
+              - key: secret_key
+                path: SECRET_KEY
+        - name: {{ include "awx.fullname" . }}-nginx-config
+          configMap:
+            name: {{ include "awx.fullname" . }}-application-config
+            items:
+              - key: nginx_conf
+                path: nginx.conf
+        - name: {{ include "awx.fullname" . }}-application-start
+          configMap:
+            name: {{ include "awx.fullname" . }}-application-start
+            defaultMode: 0755
+            items:
+              - key: entry_point_web
+                path: web-entrypoint.sh
+              - key: init_venv
+                path: init_venv.sh
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ include "awx.fullname" . }}-task
+  namespace: {{ .Release.Namespace }}
+  labels:
+    ansible/name: {{ template "awx.fullname" . }}-task
+    app.kubernetes.io/name: {{ include "awx.name" . }}-task
+    helm.sh/chart: {{ include "awx.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    {{- range $key, $value := .Values.deployment.annotations }}
+      {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.awx_task.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "awx.name" . }}-task
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "awx.name" . }}-task
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        ansible/name: {{ template "awx.fullname" . }}-task
+    spec:
+      containers:
+        - name: task
+          image: "{{ .Values.awx_task.image.repository }}:{{ .Values.awx_task.image.tag }}"
+          imagePullPolicy: {{ .Values.awx_task.image.pullPolicy }}
+          command:
+            - /tini
+            - --
+            - /etc/bin/task-entrypoint.sh
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - if ( test $(ps aux | grep supervisord | grep -v grep | grep -v wc | wc -l) -eq 0); then exit 1; fi
+            periodSeconds: 30
+            failureThreshold: 10
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - if ( test $(ps aux | grep supervisord | grep -v grep | grep -v wc | wc -l) -eq 0); then exit 1; fi
+          volumeMounts:
+            - mountPath: /etc/tower
+              name: {{ include "awx.fullname" . }}-application-config
+            - mountPath: /etc/bin
+              name: {{ include "awx.fullname" . }}-application-start
+          env:
+            - name: DATABASE_USER
+              value: {{ .Values.postgresql.postgresqlUsername }}
+            - name: DATABASE_NAME
+              value: {{ .Values.postgresql.postgresqlDatabase }}
+            - name: DATABASE_HOST
+              value: {{ include "awx.fullname" . }}-postgresql
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_PASSWORD
+              value: {{ .Values.postgresql.postgresqlPassword }}
+            - name: MEMCACHED_HOST
+              value: {{ include "awx.fullname" . }}-memcached
+            - name: RABBITMQ_HOST
+              value: {{ include "awx.fullname" . }}-rabbitmq
+            - name: AWX_ADMIN_USER
+              value: {{ .Values.default_admin_user }}
+            - name: AWX_ADMIN_PASSWORD
+              value: {{ .Values.default_admin_password }}
+            - name: http_proxy
+              value: {{ .Values.proxy.address }}
+            - name: https_proxy
+              value: {{ .Values.proxy.address }}
+            - name: no_proxy
+              value: {{ .Values.proxy.noproxy }}
+
+    {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+    {{- end }}
+      volumes:
+        - name: {{ include "awx.fullname" . }}-application-config
+          configMap:
+            name: {{ include "awx.fullname" . }}-application-config
+            items:
+              - key: awx_settings
+                path: settings.py
+              - key: secret_key
+                path: SECRET_KEY
+        - name: {{ include "awx.fullname" . }}-application-start
+          configMap:
+            name: {{ include "awx.fullname" . }}-application-start
+            defaultMode: 0755
+            items:
+              - key: entry_point_task
+                path: task-entrypoint.sh
+              - key: init_venv
+                path: init_venv.sh

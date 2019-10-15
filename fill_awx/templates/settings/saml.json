@@ -1,0 +1,51 @@
+{
+    "SOCIAL_AUTH_SAML_SP_ENTITY_ID": "awx{{ (environment_name == 'prd') | ternary('', '-' + environment_name) }}",
+    "SOCIAL_AUTH_SAML_SP_PUBLIC_CERT": "{{ saml_certificate_public }}",
+    "SOCIAL_AUTH_SAML_SP_PRIVATE_KEY": "{{ saml_certificate_private }}",
+    "SOCIAL_AUTH_SAML_ORG_INFO": {
+        "en-US": {
+            "url": "https://chez.toi",
+            "displayname": "GIAC",
+            "name": "GIAC"
+        }
+    },
+    "SOCIAL_AUTH_SAML_TECHNICAL_CONTACT": {
+        "givenName": "Engie IT",
+        "emailAddress": "contact@chez.toi"
+    },
+    "SOCIAL_AUTH_SAML_SUPPORT_CONTACT": {
+        "givenName": "Engie IT",
+        "emailAddress": "contact@chez.toi"
+    },
+    "SOCIAL_AUTH_SAML_ENABLED_IDPS": {
+        "idp": {
+            "attr_last_name": "user.lastName",
+            "attr_username": "name_id",
+            "entity_id": "{{ saml.OKTA.entity }}",
+            "attr_user_permanent_id": "name_id",
+            "url": "{{ saml.OKTA.url }}",
+            "attr_email": "user.email",
+            "x509cert": "{{ saml.OKTA.certificate }}",
+            "attr_first_name": "user.firstName"
+        }
+    },
+    "SOCIAL_AUTH_SAML_SECURITY_CONFIG": {
+        "requestedAuthnContext": false
+    },
+    "SOCIAL_AUTH_SAML_SP_EXTRA": {},
+    "SOCIAL_AUTH_SAML_EXTRA_DATA": [],
+    "SOCIAL_AUTH_SAML_ORGANIZATION_MAP": {
+        "IaCaC": {
+            "users": true
+        }
+    },
+    "SOCIAL_AUTH_SAML_TEAM_MAP": {
+        "All": {
+            "organization": "IaCaC",
+            "users": true,
+            "remove": false
+        }
+    },
+    "SOCIAL_AUTH_SAML_ORGANIZATION_ATTR": {},
+    "SOCIAL_AUTH_SAML_TEAM_ATTR": {}
+}
