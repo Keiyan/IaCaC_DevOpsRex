@@ -4,34 +4,67 @@ awx:
   uri: 'http://awx' # The uri of your awx installation.
   user: 'admin' # The default username
   password: 'password' # the default password
+  version: 9.1.0 # The version of AWX to fetch
 gogs:
   uri: 'http://gogs:3000' # The uri of your gogs installation
   user: 'DevOpsRex' # default gogs username
   password: 'DevOpxRex2019$' # default gogs password
+  source_branch: master # The full name of the branch to take in referenced repos
+  source_branch_name: master # That's the leaf of source_branch. e.g. /refs/heads/master -> master
+  sources:
+    infra_templates: ../Templates # either an URI to a git repo or a folder on your computer
+ldap:
+  username: # The username to fetch users from AD
+  password: # corresponding password
 saml:
   certificate: # SAML certificate, as provided by your technical provider
   entity: # Entity ID, as provided by your technical provider
   url: # SAML url, as provided by your technical provider
 environment_name: # Should be empty for PROD, env for others (eg dev1, dev2, hom, ...)
 credentials:
-  AD: # parameters used to join the AD
-    username:
-    password:
   Azure: # parameters used to connect to Azure
     subscription:
     tenant:
     application_id:
     application_secret:
 ansible_sudo_pass: # password to become super user on the machine where this playbook is ran.
-infra_templates: # this is the list of available playbooks. It is used at first setup to create empty shells
-  - preregister_vm
-  - create_vm
-  - install_software
-  - register_vm
-  - unregister_vm
-  - delete_vm
-keep_admin_account: true # set to true to keep it, false to remove it
-dev_branch: 'master' # Switch to your feature branch in development
-setup_awx: true # Set to false to skip the container creation phase
+postgres:
+  user: 'postgres' # user to authenticate to postgres from other containers
+  password: 'changeM3!' # and corresponding password
+  replication:
+    user: 'postgres_repl' # When postgres is in cluster mode, this is the user to replicate data
+    password: 'changeM3!' # and corresponding password
+kubernetes:
+  target: local # can be local for docker desktop (or minikube) and rancher for a rancher deployment
+  namespace: default # namespace where AWX will be deployed
+  service_dns_suffix: svc.cluster.local # change it if you configured your kube with a different namespace
+  proxy: # You have a corporate proxy ? Set it here !
+  environment: # name of environment. Should be equal to environment_name
+  cluster: # used only in rancher mode
+    name: # name of your cluster
+    url: # URI of the cluster
+    certificate: # certificate for your cluster
+    user: # user name to connect to cluster
+    token: # and corresponding password
+  replicas:
+    awx_web: 1 # amount of awx_web containers
+    awx_task: 1 # amount of awx_task containers
+    rabbitmq: 1 # amount of rabbitmq containers
+    postgres: 1 #amoun of postgres container. If greater than 1, postgres switch to cluster mode
+  host:
+    awx: awx # public hostname for awx
+    gogs: gogs # public hostname for gogs
+ansible:
+  version: 2.9.2 # ansible version to use when running playbook. Independant from AWX ansible version
+virtualenv:
+  path: /tmp/venvs # path to the venvs inside AWX containers
+  name: /devopsrex # venv name
+control:
+  keep_admin_account: true # set to false to remove admin account from AWX post install
+  setup_awx: true # control if helm chart is applied
+  fill_gogs: true # control if gogs repos are filled
+  fill_awx: true # control if AWX is populated
+  test_awx: false #control if tests are run
+deployment_type: k8s # can be k8s or compose
 validate_certs: false # Set to true if you got a valid certificate !
 

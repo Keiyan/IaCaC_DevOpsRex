@@ -23,20 +23,24 @@ This playbook allows you to fully set up Ansible AWX on a machine. It rans throu
 - pip
 - Docker
 - Docker-compose
+- Kubernetes
+- Helm
 
 ## How to deploy
 
-1. Rename the `inventory.sample.yml` file to `inventory.yml` and fill it with your credentials
-2. Run the command `ansible-playbook setup_awx.yml` from the command line.
+1. Unpack the Templates_dor.7z file so that is is at the same level of the IaCaC_DevOpsRex directory
+2. Run the command `ansible-playbook k8s_local_init.yml` to set up your local kubernetes cluster
+3. Rename the `inventory.sample.yml` file to `inventory.yml` and fill it with your credentials
+4. Run the command `ansible-playbook setup_awx.yml` from the command line.
 
 ## Layout
 
 here is this repository layout :
 ```
 root
-|-- awx_setup # Role used to set up AWX content
-|  |-- files
-|  |  |-- hello_world.yml # used to craete mock playbooks during initial setup
+|-- awx_chart # Helm chart used to create containers
+|-- azure_yaml # deployment logic for Azure DevOps
+|-- fill_awx # Role used to set up AWX content
 |  |-- tasks
 |  |  |-- functions
 |  |  |-- main.yml
@@ -44,12 +48,16 @@ root
 |  |-- templates
 |  |-- vars
 |  |  |-- main.yml # Contains non secret vars
-|-- awx_tests # Role used to test templates
+|-- git # Role used to push templates and roles to GOGS
+|-- gogs # Role used to build GOGS and initialize it
+|-- kubernetes # Role used to run helm chart and create containers
+|-- setup_awx # Role used for initial setup of AWX
+|-- tests # Role used to test templates
 |  |-- tasks
 |  |  |-- functions
 |  |  |-- main.yml
 |  |  |...
-|-- compose # Contains docker compose files
+|-- azure-pipelins.yml # contains deployment logic
 |-- inventory.yml # Contains secrets, not in source control (well, except for this sample repo)
-|-- setup.yml # The main playbook
+|-- setup_awx.yml # The main playbook
 ```

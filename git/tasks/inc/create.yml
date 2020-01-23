@@ -1,0 +1,16 @@
+---
+
+- name: ensure Git is configured
+  shell: |
+    git config --global http.sslVerify false
+    git config --global user.email "VstsAgent@engie.com"
+    git config --global user.name "VSTS Agent"
+    git config --global push.default simple
+
+- name: "create repository {{ repository.key }}"
+  include_tasks: create_inner.yml
+  vars:
+    branch: "{{ gogs.source_branch }}"
+  loop: "{{ gogs.sources | dict2items }}"
+  loop_control:
+    loop_var: repository

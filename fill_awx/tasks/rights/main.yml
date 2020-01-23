@@ -1,0 +1,28 @@
+- set_fact:
+    rights:
+    - team: "{{ team_all }}"
+      roles:
+        - name: read
+          objects:
+            - "{{ organisation }}"
+        - name: use
+          objects:
+            - "{{ Azure_credentials }}"
+            - "{{ Azure_inventory }}"
+            - "{{ VMBlacklist_credentials }}"
+        - name: update
+          objects:
+            - "{{ infra_template_project }}"
+        - name: execute
+          objects:
+            - "{{ preregister_vm }}"
+            - "{{ create_vm }}"
+            - "{{ install_software }}"
+            - "{{ register_vm }}"
+            - "{{ unregister_vm }}"
+            - "{{ delete_vm }}"
+            - "{{ create_virtual_machine }}"
+            - "{{ delete_virtual_machine }}"
+
+- include_tasks: functions/set_rights.yml
+  loop: "{{ rights | subelements ('roles' ) }}"

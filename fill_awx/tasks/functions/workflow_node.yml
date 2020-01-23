@@ -1,0 +1,13 @@
+---
+
+- include_tasks: functions/create_awx_object.yml
+  loop:
+    - { 
+        variable: "{{ node.variable }}",
+        api: 'workflow_job_template_nodes',
+        search: {
+          unified_job_template: "{{ node.target.id }}",
+          workflow_job_template: "{{ node.workflow.id }}"
+        },
+        body: "{{ lookup('template','workflow_job_template_nodes/node.json') }}"
+      }

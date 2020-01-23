@@ -1,0 +1,9 @@
+{
+    "name": "Azure inventory",
+    "description": "Contains all VM from Azure",
+    "organization": {{ organisation.id }},
+    "kind": "",
+    "host_filter": null,
+    "variables": "---",
+    "insights_credential": null
+}

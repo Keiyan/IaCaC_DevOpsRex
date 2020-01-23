@@ -1,0 +1,73 @@
+steps: 
+  - checkout: self
+    persistCredentials: true
+  - task: qetza.replacetokens.replacetokens-task.replacetokens@3
+    displayName: 'Replace tokens'
+    inputs:
+      targetFiles: '**/*.token'
+      escapeType: none
+      actionOnMissing: fail
+  - pwsh: |
+      $currentFolder = Get-Location
+      $absoluteSource = (Get-Item $Env:SourceFolder).FullName
+
+      try
+      {
+        $fileList = Get-ChildItem -File -Recurse $absoluteSource -Filter '*.token'
+        foreach ( $file in $fileList )
+        {
+          $targetFile = $file.FullName.Trim('.token')
+          Write-Host "Changing $($file.FullName) to $targetFile"
+          Copy-Item $file.FullName $targetFile
+        }
+      }
+      finally
+      {
+        Set-Location $currentFolder
+      }
+
+    name: overwrite
+    displayName: 'Overwrite files with their .token equivalent'
+    env:
+      SourceFolder: $(Build.SourcesDirectory)
+  - task: DownloadSecureFile@1
+    name: 'certificate_dev1'
+    displayName: 'Obtain certificate'
+    inputs:
+      secureFile: 'giacportal-dev1.gem.myengie.com.pem.crt'
+  - task: DownloadSecureFile@1
+    name: 'privatekey_dev1'
+    displayName: 'Obtain private key'
+    inputs:
+      secureFile: 'giacportal-dev1.gem.myengie.com.pem.key'
+  - task: DownloadSecureFile@1
+    name: 'certificate_hom'
+    displayName: 'Obtain certificate'
+    inputs:
+      secureFile: 'giacportal-hom.gem.myengie.com.pem.crt'
+  - task: DownloadSecureFile@1
+    name: 'privatekey_hom'
+    displayName: 'Obtain private key'
+    inputs:
+      secureFile: 'giacportal-hom.gem.myengie.com.pem.key'
+  - task: DownloadSecureFile@1
+    name: 'certificate_prd'
+    displayName: 'Obtain certificate'
+    inputs:
+      secureFile: 'giacportal-prd.gem.myengie.com.pem.crt'
+  - task: DownloadSecureFile@1
+    name: 'privatekey_prd'
+    displayName: 'Obtain private key'
+    inputs:
+      secureFile: 'giacportal-prd.gem.myengie.com.pem.key'
+  - task: CopyFiles@2
+    displayName: 'put certificate and key in place'
+    inputs:
+      SourceFolder: '$(Agent.TempDirectory)'
+      Contents: 'giacportal-$(System.StageName).gem.myengie.com.pem.*'
+      TargetFolder: 'awx-chart/files'
+      OverWrite: true
+  - task: ms-vscs-rm.vss-services-ansible.ansible-task.Ansible@0
+    displayName: 'Run AWX setup playbook'
+    inputs:
+      playbookPathOnAgentMachine: '$(System.DefaultWorkingDirectory)/setup_awx.yml'

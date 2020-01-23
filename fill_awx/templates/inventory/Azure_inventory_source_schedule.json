@@ -1,0 +1,11 @@
+{
+  "rrule": "DTSTART;TZID=Europe/Berlin:20190717T003000 RRULE:FREQ=DAILY;INTERVAL=1",
+  "name": "Nightly refresh",
+  "description": "every day",
+  "extra_data": {},
+  "inventory": null,
+  "job_type": null,
+  "diff_mode": null,
+  "verbosity": null,
+  "enabled": true
+}

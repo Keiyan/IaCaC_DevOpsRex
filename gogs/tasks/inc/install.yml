@@ -1,0 +1,51 @@
+---
+
+- name: Check if Gogs is installed
+  uri:
+    url: "{{ gogs.uri }}:{{ gogs.port }}/"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+    status_code:
+      - 200
+      - 302
+    follow_redirects: all
+  register: is_gogs_alive
+  delay: 60
+  retries: 1
+  until: is_gogs_alive.status == 200 or is_gogs_alive.status == 302
+
+- name: Install Gogs
+  uri:
+    url: "{{ gogs.uri }}:{{ gogs.port }}/install/"
+    validate_certs: "{{ validate_certs }}"
+    method: POST
+    status_code: 200
+    follow_redirects: all
+    body_format: form-urlencoded
+    body:
+      db_type: 'SQLite3'
+      db_host: '127.0.0.1:3306'
+      db_user: 'root'
+      db_passwd:
+      db_name: 'gogs'
+      ssl_mode: 'disable'
+      db_path: 'data/gogs.db'
+      app_name: 'Gogs'
+      repo_root_path: '/data/git/gogs-repositories'
+      run_user: 'git'
+      domain: 'localhost'
+      ssh_port: '22'
+      http_port: '3000'
+      app_url: '{{ gogs.uri }}:{{ gogs.port }}'
+      log_root_path: '/app/gogs/log'
+      smtp_host:
+      smtp_from:
+      smtp_user:
+      smtp_passwd:
+      admin_name: "{{ gogs.user }}"
+      admin_passwd: "{{ gogs.password }}"
+      admin_confirm_passwd: "{{ gogs.password }}"
+      admin_email: 'GIAC@engie.com'
+  when: 
+    - is_gogs_alive.redirected == true
+    - is_gogs_alive.url.endswith('install')

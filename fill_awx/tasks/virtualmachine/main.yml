@@ -1,0 +1,5 @@
+---
+
+- include_tasks: base.yml
+- include_tasks: create.yml
+- include_tasks: delete.yml

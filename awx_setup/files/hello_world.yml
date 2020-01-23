@@ -1,7 +1,0 @@
----
-
-# This simple playbook is used at first setup to craete empty shells for playbooks
-- hosts: localhost
-  tasks:
-    - debug:
-        msg: "Hello world !"

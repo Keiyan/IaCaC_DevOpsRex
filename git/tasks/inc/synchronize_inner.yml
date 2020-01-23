@@ -1,0 +1,80 @@
+---
+
+- name: "fetch git repository from {{ repository.value }}"
+  git:
+    repo: "{{ repository.value }}"
+    dest: "./repos/{{ repository.key }}source"
+    version: "{{ branch }}"
+  register: git_pull_branch_result
+  ignore_errors: true
+  when: repository.value.startswith ('http')
+
+- name: "fetch git repository from {{ repository.value }} (fallback to master if {{ branch }} doesn't exists)"
+  git:
+    repo: "{{ repository.value }}"
+    dest: "./repos/{{ repository.key }}source"
+    version: "master"
+  when:
+    - repository.value.startswith ('http')
+    - git_pull_branch_result.failed == true
+
+- block:
+  - name: prepare list of files to be copied
+    find:
+      paths: "{{ repository.value }}"
+      excludes: '.git'
+      hidden: yes
+      file_type: any
+    register: git_file_list
+
+  - name: "copy git repository from {{ repository.value }}"
+    copy:
+      src: "{{ item.path }}"
+      dest: "./repos/{{ repository.key }}source/"
+    loop: "{{ git_file_list.files }}"
+  when: repository.value is directory
+
+- name: fetch git repository (Gogs))
+  shell: |
+    git clone --quiet --branch master --depth 1 --single-branch {{ (gogs.uri + ':' + gogs.port) |replace('://', '://' + gogs.token + '@') }}/{{ gogs.user }}/{{ repository.key }} {{ repository.key }}
+  args:
+    chdir: './repos'
+
+- name: find all file to replace
+  find:
+    paths: './repos/{{ repository.key }}source'
+    patterns: '*.token.j2'
+    recurse: yes
+  register: template_files
+
+- name: "replace file {{ item.path }}"
+  template:
+    src: "{{ item.path }}"
+    dest: "{{ item.path | replace ('.token.j2', '') }}"
+    force: yes
+  loop: "{{ template_files.files }}"
+
+- name: clean gogs repository
+  shell: |
+    git rm -rf *
+    git commit -a -m 'cleaning existing files'
+  args:
+    chdir: "./repos/{{ repository.key }}"
+
+- name: remove .git from source directory
+  file:
+    path: "./repos/{{ repository.key }}source/.git"
+    state: absent
+
+- name: copy new files
+  copy:
+    src: "./repos/{{ repository.key }}source/"
+    dest: "./repos/{{ repository.key }}/"
+
+- name: push it to Gogs
+  shell: |
+    git add .
+    git commit -a -m "Version {{ release_name | default ('in development') }}"
+    git push --force --mirror --quiet
+  args:
+    chdir: "./repos/{{ repository.key }}"

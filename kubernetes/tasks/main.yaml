@@ -1,0 +1,49 @@
+---
+
+- name: create Chart values.yaml file
+  template:
+    src: templates/values.yaml.j2
+    dest: awx-chart/values.yaml
+    force: yes
+
+- name: Configure cluster access
+  template:
+    src: templates/kube.config.j2
+    dest: "{{ lookup( 'env', 'HOME' ) }}/.kube/config"
+    force: yes
+  when:
+    - kubernetes.target == "rancher"
+
+- name: retrieve pod information
+  k8s_info:
+    kind: pod
+    namespace: "{{ kubernetes.namespace }}"
+    label_selectors:
+      - ansible/name = awx-chart-{{ environment_name | lower }}-web
+  register: web_pod_exists
+
+- name: fetch helm chart dependencies
+  shell: "helm3 dependency update ./awx-chart"
+
+- name: deploy helm chart
+  shell: "helm3 install awx-chart-{{ environment_name | lower }} --namespace {{ kubernetes.namespace }} ./awx-chart"
+  when: web_pod_exists.resources | length == 0
+
+- name: Upgrade helm chart
+  shell: "helm3 upgrade awx-chart-{{ environment_name | lower }} --namespace {{ kubernetes.namespace }} ./awx-chart"
+  when: web_pod_exists.resources | length > 0
+
+- name: "wait for {{ item }} pod to get ready"
+  k8s_info:
+    kind: pod
+    namespace: "{{ kubernetes.namespace }}"
+    label_selectors:
+      - ansible/name = awx-chart-{{ environment_name | lower }}-{{ item }}
+  register: pod_creation
+  until: pod_creation.resources | length > 0 and pod_creation.resources[0].status.phase == 'Running' and pod_creation.resources[0].status.containerStatuses[0].ready == true
+  delay: 20
+  retries: 60
+  loop:
+    - web
+    - task
+    - gogs

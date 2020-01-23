@@ -1,0 +1,55 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "awx.fullname" . }}-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "awx.name" . }}
+    helm.sh/chart: {{ include "awx.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    ansible/name: {{ template "awx.fullname" . }}-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  {{- if eq .Values.target "rancher" }}
+  tls:
+    - hosts:
+      - {{ .Values.service.awx.host }}
+      {{- if .Values.certificate.crt }}
+      secretName: {{ template "awx.fullname" . }}-certificate
+      {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.service.awx.host }}
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: {{ template "awx.fullname" . }}
+              servicePort: 80
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "awx.fullname" . }}-gogs-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "awx.name" . }}
+    helm.sh/chart: {{ include "awx.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    ansible/name: {{ template "awx.fullname" . }}-gogs-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: {{ .Values.service.gogs.host }}
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: {{ template "awx.fullname" . }}-gogs
+              servicePort: 80

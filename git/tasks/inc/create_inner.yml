@@ -1,0 +1,54 @@
+---
+
+- name: check if {{ repository.key }} repository exists
+  uri:
+    headers:
+      Authorization: "token {{ gogs.token }}"
+    url: "{{ gogs.uri }}:{{ gogs.port }}/api/v1/repos/search?q={{ repository.key }}&limit=1"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: repo_exists
+
+- block:
+  - name: create {{ repository.key }} repository
+    uri:
+      headers:
+        Authorization: "token {{ gogs.token }}"
+      url: "{{ gogs.uri }}:{{ gogs.port }}/api/v1/admin/users/{{ gogs.user }}/repos/"
+      validate_certs: "{{ validate_certs }}"
+      method: POST
+      status_code: 201
+      body_format: json
+      body:
+        name: "{{ repository.key }}"
+        description: "{{ repository.key }}"
+
+  - name: Clean existing files
+    file:
+      state: absent
+      path: "./{{ repository.key }}"
+  - name: create directory
+    file:
+      state: directory
+      path: "./{{ repository.key }}"
+
+  - name: create templates
+    copy:
+      dest: "./{{ repository.key }}/sample.yml"
+      content: "{{ lookup ('file','hello_world.yml') }}"
+
+  - name: add files
+    shell: > 
+      git init;
+      git add .;
+      git commit -m "first commit";
+      git remote add origin {{ (gogs.uri + ':' + gogs.port) |replace('://', '://' + gogs.token + '@') }}/{{ gogs.user }}/{{ repository.key }}.git;
+      git push -u origin master
+    args:
+      chdir: "./{{ repository.key }}"
+
+  - name: Clean files
+    file:
+      state: absent
+      path: "./{{ repository.key }}"
+  when: repo_exists.json.data|length == 0

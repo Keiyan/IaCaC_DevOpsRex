@@ -1,0 +1,13 @@
+---
+
+- name: "Retrieve {{ find_awx_display_name }}"
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}"
+    url: "{{ awx.uri }}/api/v2/{{ find_awx_api }}/?{{ find_awx_query_string }}"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: find_awx_create_item_exists
+
+- name: "get {{ find_awx_display_name }}"
+  set_fact: {"{{ find_awx_variable_name }}": "{{ find_awx_create_item_exists.json.results[0] }}"}

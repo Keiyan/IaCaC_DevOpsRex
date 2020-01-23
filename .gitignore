@@ -396,6 +396,19 @@ __pycache__/
 *.pem
 *.crt
 *.csr
+*.key
 *.retry
 infra_templates
 inventory.yml
+values.yaml
+repos
+
+# Avoid putting passwords in repo
+setup_awx/vars/main.yml
+
+# helm dependencies
+*.tgz
+*.lock
+
+# helm temp folder
+awx-chart/tmpcharts/*

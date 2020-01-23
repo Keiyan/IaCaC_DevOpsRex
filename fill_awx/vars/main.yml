@@ -1,0 +1,6 @@
+---
+
+vm_blacklist:
+  - 'toto'
+  - 'WINDOWS_BRIDGE'
+WINDOWS_BRIDGE: WINDOWS_BRIDGE.azure.com

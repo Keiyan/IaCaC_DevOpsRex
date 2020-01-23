@@ -1,0 +1,68 @@
+---
+
+- name: create workflow job templates for VM creation
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - variable: 'create_virtual_machine'
+      api: 'workflow_job_templates'
+      name: 'Create Virtual Machine'
+      body:
+        name: "Create Virtual Machine"
+        description: ""
+        extra_vars: "vm_kind: 'cloud'\nlifetime: '12M'"
+        organization: "{{ organisation.id }}"
+        survey_enabled: true
+        allow_simultaneous: true
+        ask_variables_on_launch: false
+        inventory: null
+        ask_inventory_on_launch: false
+
+- name: create survey for workflow job templates for VM creation
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}/api/v2/workflow_job_templates/{{ create_virtual_machine.id }}/survey_spec/"
+    validate_certs: "{{ validate_certs }}"
+    method: POST
+    body_format: json
+    body: "{{ lookup('template','workflow_job_templates/create_virtual_machine_survey.json') }}"
+
+- name: create nodes for workflow job templates for VM creation
+  include_tasks: functions/workflow_node.yml
+  loop:
+    - variable: 'preregister_vm_node'
+      workflow: "{{ create_virtual_machine }}"
+      target: "{{ preregister_vm }}"
+    - variable: 'create_vm_node'
+      workflow: "{{ create_virtual_machine }}"
+      target: "{{ create_vm }}"
+    - variable: 'install_software_node'
+      workflow: "{{ create_virtual_machine }}"
+      target: "{{ install_software }}"
+    - variable: 'register_vm_node'
+      workflow: "{{ create_virtual_machine }}"
+      target: "{{ register_vm }}"
+    - variable: 'unregister_vm_node'
+      workflow: "{{ create_virtual_machine }}"
+      target: "{{ unregister_vm }}"
+    - variable: 'delete_vm_node'
+      workflow: "{{ create_virtual_machine }}"
+      target: "{{ delete_vm }}"
+  loop_control:
+    loop_var: node
+
+- name: link nodes for workflow job templates for VM creation
+  include_tasks: functions/workflow_link_nodes.yml
+  loop:
+    - { source: "{{ preregister_vm_node }}", destination: "{{ create_vm_node }}", type: 'success' }
+    - { source: "{{ create_vm_node }}", destination: "{{ install_software_node }}", type: 'success' }
+    - { source: "{{ create_vm_node }}", destination: "{{ register_vm_node }}", type: 'success' }
+    - { source: "{{ preregister_vm_node }}", destination: "{{ unregister_vm_node }}", type: 'failure' }
+    - { source: "{{ create_vm_node }}", destination: "{{ unregister_vm_node }}", type: 'failure' }
+    - { source: "{{ install_software_node }}", destination: "{{ unregister_vm_node }}", type: 'failure' }
+    - { source: "{{ register_vm_node }}", destination: "{{ unregister_vm_node }}", type: 'failure' }
+    - { source: "{{ create_vm_node }}", destination: "{{ delete_vm_node }}", type: 'failure' }
+    - { source: "{{ install_software_node }}", destination: "{{ delete_vm_node }}", type: 'failure' }
+    - { source: "{{ register_vm_node }}", destination: "{{ delete_vm_node }}", type: 'failure' }
+  loop_control:
+    loop_var: node_link

@@ -1,0 +1,12 @@
+---
+
+- include_tasks: functions/create_awx_object.yml
+  loop:
+    - {
+      variable: "{{ node_link.variable | default('workflow_link_nodes_link_var') }}",
+      api: "workflow_job_template_nodes/{{ node_link.source.id }}/{{ node_link.type }}_nodes",
+      search: {
+        id: "{{ node_link.destination.id }}"
+      },
+      body: '{"id": {{ node_link.destination.id }}}'
+    }

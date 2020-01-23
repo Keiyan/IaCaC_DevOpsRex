@@ -1,0 +1,65 @@
+---
+
+- name: prepare output
+  set_fact:
+    awx_test_output: "{{ [] }}"
+
+- name: ensure initial inventory has ended
+  uri:
+    headers:
+      Authorization: "Bearer {{ awx.token }}"
+    url: "{{ awx.uri }}/api/v2/inventory_updates/1/"
+    validate_certs: "{{ validate_certs }}"
+    method: GET
+  register: initial_inventory_update
+  until: initial_inventory_update.json.status == "successful"
+  delay: 60
+  retries: 30
+
+- name: Should create on premise VM
+  include_tasks: functions/run_template.yml
+  vars:
+    play: true
+    template:
+      name: "Create Virtual Machine"
+      variable: "create_vm_on_azure"
+      parameters:
+        application_trigram: TST
+        owner: Mick
+        operating_system: Windows
+        cpu_count: 2
+        ram_size: 4096
+        disks: "C,SYSTEM,50;"
+
+- name: Should delete on premise VM
+  include_tasks: functions/run_template.yml
+  vars:
+    play: true
+    template:
+      name: "Delete Virtual Machine"
+      variable: "delete_vm_on_azure"
+      parameters:
+        vm_name: "VM_TST_01"
+
+- name: Should fail deletion when VM name is in blacklist
+  include_tasks: functions/run_template.yml
+  vars:
+    play: false
+    template:
+      name: "Delete Virtual Machine"
+      variable: "delete_fail_upon_blacklist"
+      expected_result: 'failed'
+      parameters:
+        vm_name: "toto"
+
+- name: "Set tests result"
+  set_fact:
+    awx_tests_result: "{{ 
+      (create_vm_on_azure | default(true))
+      and (delete_vm_on_azure | default(true))
+      and (delete_fail_upon_blacklist | default(true))
+      }}"
+
+- name: "Display test results"
+  debug:
+    var: awx_test_output

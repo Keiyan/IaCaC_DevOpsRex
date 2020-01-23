@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "awx.fullname" . }}-postgres-volume
+  namespace: {{ .Release.Namespace }}
+spec:
+  storageClassName: {{ if eq .Values.target "local" }}manual{{ else }}azure-disk{{ end }}
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+status: {}
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "awx.fullname" . }}-rabbitmq-volume
+  namespace: {{ .Release.Namespace }}
+spec:
+  storageClassName: {{ if eq .Values.target "local" }}manual{{ else }}azure-disk{{ end }}
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+status: {}
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "awx.fullname" . }}-gogs-volume
+  namespace: {{ .Release.Namespace }}
+spec:
+  storageClassName: {{ if eq .Values.target "local" }}manual{{ else }}azure-disk{{ end }}
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+status: {}

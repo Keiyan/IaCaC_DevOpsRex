@@ -1,0 +1,41 @@
+---
+
+- name: create Azure inventory
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - { variable: 'Azure_credentials', api: 'credentials', name: 'Azure', body: "{{ lookup('template','credentials/Azure.json') }}" }
+    - { variable: 'Azure_inventory', api: 'inventories', name: 'Azure inventory', body: "{{ lookup('template','inventory/Azure_inventory.json') }}" }
+
+- block:
+  - name: create Azure inventory source
+    include_tasks: functions/create_awx_object.yml
+    loop:
+      - { variable: 'Azure_inventory_source', api: 'inventories/{{ Azure_inventory.id }}/inventory_sources', name: 'Azure Inventory Source', body: "{{ lookup('template','inventory/Azure_inventory_source.json') }}" }
+      - { api: 'hosts', name: "{{ lookup ( 'vars', 'WINDOWS_BRIDGE' ) }}", body: "{{ lookup('template','inventory/windows_gateway_host.json') }}" }
+  rescue:
+  - name: wait for venvs to be scanned
+    pause:
+      seconds: 60
+  - name: create Azure inventory source
+    include_tasks: functions/create_awx_object.yml
+    loop:
+      - { variable: 'Azure_inventory_source', api: 'inventories/{{ Azure_inventory.id }}/inventory_sources', name: 'Azure Inventory Source', body: "{{ lookup('template','inventory/Azure_inventory_source.json') }}" }
+      - { api: 'hosts', name: "{{ lookup ( 'vars', 'WINDOWS_BRIDGE' ) }}", body: "{{ lookup('template','inventory/windows_gateway_host.json') }}" }
+
+
+- name: Schedule inventory refresh
+  include_tasks: functions/create_awx_object.yml
+  loop:
+    - { api: 'inventory_sources/{{ Azure_inventory_source.id }}/schedules', name: 'Nightly refresh', body: "{{ lookup('template','inventory/Azure_inventory_source_schedule.json') }}" }
+
+- name: start inventory update
+  uri:
+    headers:
+      Authorization: Bearer {{ awx.token }}
+    url: "{{ awx.uri }}{{ Azure_inventory_source.related['update'] }}"
+    validate_certs: "{{ validate_certs }}"
+    method: POST
+    body_format: json
+    status_code: 202
+    body: '{}'
+  when: Azure_inventory_source_exists == 'absent'

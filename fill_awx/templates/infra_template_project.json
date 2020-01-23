@@ -1,0 +1,15 @@
+{
+    "name": "Infra templates",
+    "description": "Job templates provided by infrastructure team",
+    "scm_type": "git",
+    "scm_url": "{{ gogs.internal_uri | default ( gogs.uri + ':' + gogs.port ) }}/{{ gogs.user }}/infra_templates.git",
+    "scm_branch": "",
+    "scm_clean": true,
+    "scm_delete_on_update": true,
+    "credential": null,
+    "timeout": 0,
+    "organization": {{ organisation.id }},
+    "scm_update_on_launch": false,
+    "scm_update_cache_timeout": 0,
+    "custom_virtualenv": null
+}

@@ -1,0 +1,53 @@
+---
+
+- block:
+  - include_tasks: functions/find_awx_object.yml
+    vars:
+      find_awx_query_string: "name={{ template.name | urlencode }}"
+      find_awx_variable_name: "find_awx_template"
+      find_awx_api: "unified_job_templates"
+      find_awx_display_name: "{{ template.name | default(template.variable) | default('AWX object') }}"
+
+  - name: "run {{ find_awx_template.name }}"
+    uri:
+      headers:
+        Authorization: "Bearer {{ awx.token }}"
+      url: "{{ awx.uri }}{{ find_awx_template.related.launch }}"
+      validate_certs: "{{ validate_certs }}"
+      method: POST
+      status_code: 201
+      body_format: json
+      body:
+        extra_vars: "{{ template.parameters }}"
+    register: job_result
+
+  - name: "Wait for {{ find_awx_template.name }} execution to end"
+    uri:
+      headers:
+        Authorization: "Bearer {{ awx.token }}"
+      url: "{{ awx.uri }}{{ job_result.json.url }}"
+      validate_certs: "{{ validate_certs }}"
+      method: GET
+      status_code: 200
+    register: job_result
+    until: job_result.json.status == 'successful' or job_result.json.status == 'failed'
+    retries: 30
+    delay: 60
+    ignore_errors: true
+
+  - name: "store result for {{ find_awx_template.name }} execution"
+    set_fact: {"{{ template.variable }}": "{{ job_result.json.status == ( template.expected_result | default('successful') ) }}"}
+
+  - name: Display test result
+    debug:
+      msg: "Test '{{ find_awx_template.name }}' ended with result {{ job_result.json.status == ( template.expected_result | default('successful') ) }}"
+
+  - name: define test result
+    set_fact:
+      awx_test_result: "{{ (job_result.json.status == ( template.expected_result | default('successful'))) | ternary('success', 'failure') }}"
+
+  - name: Register result
+    set_fact:
+      awx_test_output: "{{ awx_test_output + ['Test ' + find_awx_template.name + ' ended with result ' + awx_test_result] }}"
+
+  when: play is not defined or play == true
